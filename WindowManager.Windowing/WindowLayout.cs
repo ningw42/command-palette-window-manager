@@ -17,6 +17,21 @@ internal static class WindowLayout
             height);
     }
 
+    internal static WindowRectangle Center(WindowRectangle visibleBounds, WindowRectangle workArea)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(visibleBounds.Width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(visibleBounds.Height);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(workArea.Width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(workArea.Height);
+
+        // Even oversized windows retain their dimensions; opposite margins differ by at most one pixel.
+        return visibleBounds with
+        {
+            X = checked((int)(workArea.X + ((long)workArea.Width - visibleBounds.Width) / 2)),
+            Y = checked((int)(workArea.Y + ((long)workArea.Height - visibleBounds.Height) / 2)),
+        };
+    }
+
     internal static WindowRectangle ResizeByFivePercent(
         WindowRectangle visibleBounds, WindowRectangle workArea, bool increase)
     {

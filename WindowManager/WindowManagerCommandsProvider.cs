@@ -23,6 +23,7 @@ public partial class WindowManagerCommandsProvider : CommandProvider
         var minimize = new MinimizeCommand(windows);
         var increaseSize = new IncreaseSizeCommand(windows);
         var decreaseSize = new DecreaseSizeCommand(windows);
+        var center = new CenterCommand(windows);
         _commands = [
             new CommandItem(maximize)
             {
@@ -33,6 +34,11 @@ public partial class WindowManagerCommandsProvider : CommandProvider
             {
                 Title = "Minimize",
                 Subtitle = "Window Manager · Minimize the last-active application",
+            },
+            new CommandItem(center)
+            {
+                Title = "Center",
+                Subtitle = "Window Manager · Center without resizing; leave maximized windows unchanged",
             },
             new CommandItem(almostMaximized)
             {
@@ -49,7 +55,7 @@ public partial class WindowManagerCommandsProvider : CommandProvider
                 Title = "Decrease by 5%",
                 Subtitle = "Window Manager · Shrink by 5% of the work area, down to 10%",
             },
-            new CommandItem(new WindowManagerPage(almostMaximized, maximize, minimize, increaseSize, decreaseSize))
+            new CommandItem(new WindowManagerPage(almostMaximized, maximize, minimize, increaseSize, decreaseSize, center))
             {
                 Title = DisplayName,
                 MoreCommands = [new CommandContextItem(_settingsManager.Settings.SettingsPage)],

@@ -62,6 +62,30 @@ public sealed class WindowController : IDisposable
         return _windows.ApplyBounds(current.Identity, WindowLayout.AlmostMaximized(workArea), _lifetime.Token);
     });
 
+    /// <summary>Centers the visible frame without resizing; maximized windows are left unchanged.</summary>
+    public WindowActionResult Center() => Execute(current =>
+    {
+        if (current.State == WindowState.Maximized) return WindowActionResult.Applied;
+        if (current.State == WindowState.Minimized)
+        {
+            return WindowActionResult.Failure("Restore the target application before centering it.");
+        }
+
+        if (current.WorkArea is not { IsValid: true } workArea)
+        {
+            return WindowActionResult.Failure("The target monitor's work area could not be determined.");
+        }
+
+        if (current.VisibleBounds is not { IsValid: true } visible)
+        {
+            return WindowActionResult.Failure("The target window's visible bounds could not be determined.");
+        }
+
+        var centered = WindowLayout.Center(visible, workArea);
+        return centered == visible ? WindowActionResult.Applied
+            : _windows.ApplyPosition(current.Identity, centered, _lifetime.Token);
+    });
+
     /// <summary>Requests native maximization, which also activates the target window.</summary>
     public WindowActionResult Maximize() => Execute(current =>
         _windows.ApplyState(current.Identity, WindowState.Maximized, _lifetime.Token));

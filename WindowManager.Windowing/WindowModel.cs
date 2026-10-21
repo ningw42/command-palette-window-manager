@@ -47,5 +47,8 @@ internal interface IWindowSystem
 
     WindowActionResult ApplyBounds(WindowIdentity target, WindowRectangle bounds, CancellationToken cancellationToken);
 
+    // Move only, including fixed-size windows. Never restore or move maximized windows.
+    WindowActionResult ApplyPosition(WindowIdentity target, WindowRectangle bounds, CancellationToken cancellationToken);
+
     WindowActionResult ApplyState(WindowIdentity target, WindowState state, CancellationToken cancellationToken);
 }

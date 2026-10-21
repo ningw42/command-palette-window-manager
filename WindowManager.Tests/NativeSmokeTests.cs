@@ -61,7 +61,9 @@ public sealed class NativeSmokeTests
     }
 
     [TestMethod]
-    public void AlreadyCanceledPlacementDoesNotEvenInspectOrRestoreAWindow()
+    [DataRow(true)]
+    [DataRow(false)]
+    public void PlacementRejectsAnInvalidHandleWithoutChangingAnyWindows(bool moveOnly)
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
         {
@@ -69,7 +71,28 @@ public sealed class NativeSmokeTests
             return;
         }
 
-        var result = new Win32WindowSystem().ApplyBounds(default, new WindowRectangle(0, 0, 100, 100), new CancellationToken(true));
+        var windows = new Win32WindowSystem();
+        var bounds = new WindowRectangle(0, 0, 100, 100);
+        var result = moveOnly ? windows.ApplyPosition(default, bounds, CancellationToken.None)
+            : windows.ApplyBounds(default, bounds, CancellationToken.None);
+        Assert.IsFalse(result.Succeeded);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void AlreadyCanceledPlacementDoesNotEvenInspectOrRestoreAWindow(bool moveOnly)
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
+        {
+            Assert.Inconclusive("Requires Windows.");
+            return;
+        }
+
+        var windows = new Win32WindowSystem();
+        var bounds = new WindowRectangle(0, 0, 100, 100);
+        var token = new CancellationToken(true);
+        var result = moveOnly ? windows.ApplyPosition(default, bounds, token) : windows.ApplyBounds(default, bounds, token);
         Assert.IsFalse(result.Succeeded);
         StringAssert.Contains(result.Error, "canceled");
     }

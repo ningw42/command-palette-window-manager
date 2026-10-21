@@ -13,7 +13,7 @@ internal sealed partial class WindowManagerPage : ListPage
 
     internal WindowManagerPage(
         AlmostMaximizedCommand almostMaximized, MaximizeCommand maximize, MinimizeCommand minimize,
-        IncreaseSizeCommand increaseSize, DecreaseSizeCommand decreaseSize)
+        IncreaseSizeCommand increaseSize, DecreaseSizeCommand decreaseSize, CenterCommand center)
     {
         Icon = IconHelpers.FromRelativePath("Assets\\StoreLogo.png");
         Title = "Window Manager";
@@ -28,6 +28,11 @@ internal sealed partial class WindowManagerPage : ListPage
             {
                 Title = "Minimize",
                 Subtitle = "Minimize the last-active application",
+            },
+            new ListItem(center)
+            {
+                Title = "Center",
+                Subtitle = "Center without resizing; leave maximized windows unchanged",
             },
             new ListItem(almostMaximized)
             {

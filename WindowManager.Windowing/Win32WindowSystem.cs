@@ -65,7 +65,14 @@ internal sealed unsafe class Win32WindowSystem : IWindowSystem
         return new WindowSnapshot(new WindowIdentity((nint)hwnd.Value, processId, threadId), kind, workArea, visibleBounds, state);
     }
 
-    public WindowActionResult ApplyBounds(WindowIdentity target, WindowRectangle bounds, CancellationToken cancellationToken)
+    public WindowActionResult ApplyBounds(WindowIdentity target, WindowRectangle bounds, CancellationToken cancellationToken) =>
+        ApplyPlacement(target, bounds, resize: true, cancellationToken);
+
+    public WindowActionResult ApplyPosition(WindowIdentity target, WindowRectangle bounds, CancellationToken cancellationToken) =>
+        ApplyPlacement(target, bounds, resize: false, cancellationToken);
+
+    private WindowActionResult ApplyPlacement(
+        WindowIdentity target, WindowRectangle bounds, bool resize, CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested) return Canceled();
         var snapshot = ReadWindow(target.Handle);
@@ -74,15 +81,24 @@ internal sealed unsafe class Win32WindowSystem : IWindowSystem
             return WindowActionResult.Failure("The target window changed or is no longer eligible.");
         }
 
-        var hwnd = new HWND(target.Handle);
-        var style = (WINDOW_STYLE)(uint)(nuint)PInvoke.GetWindowLongPtr(hwnd, WINDOW_LONG_PTR_INDEX.GWL_STYLE);
-        if ((style & WINDOW_STYLE.WS_THICKFRAME) == 0)
+        if (!resize && snapshot.State != WindowState.Normal)
         {
-            return WindowActionResult.Failure("This application window does not support resizing.");
+            return snapshot.State == WindowState.Maximized ? WindowActionResult.Applied
+                : WindowActionResult.Failure("Restore the target application before moving it.");
+        }
+
+        var hwnd = new HWND(target.Handle);
+        if (resize)
+        {
+            var style = (WINDOW_STYLE)(uint)(nuint)PInvoke.GetWindowLongPtr(hwnd, WINDOW_LONG_PTR_INDEX.GWL_STYLE);
+            if ((style & WINDOW_STYLE.WS_THICKFRAME) == 0)
+            {
+                return WindowActionResult.Failure("This application window does not support resizing.");
+            }
         }
 
         var elapsed = Stopwatch.StartNew();
-        if (PInvoke.IsIconic(hwnd) || PInvoke.IsZoomed(hwnd))
+        if (resize && (PInvoke.IsIconic(hwnd) || PInvoke.IsZoomed(hwnd)))
         {
             // Unlike SW_RESTORE, SW_SHOWNOACTIVATE does not request foreground activation.
             if (cancellationToken.IsCancellationRequested) return Canceled();
@@ -110,16 +126,25 @@ internal sealed unsafe class Win32WindowSystem : IWindowSystem
             var current = ReadWindow(target.Handle);
             if (current?.Identity != target || current.Kind != WindowKind.Application)
             {
-                return WindowActionResult.Failure("The target window changed before it could be resized.");
+                return WindowActionResult.Failure("The target window changed before it could be placed.");
             }
 
+            // Center must not restore or move a window that became maximized after capture.
+            if (!resize && current.State != WindowState.Normal)
+            {
+                return current.State == WindowState.Maximized ? WindowActionResult.Applied
+                    : WindowActionResult.Failure("Restore the target application before moving it.");
+            }
+
+            var flags = SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER
+                | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER | SET_WINDOW_POS_FLAGS.SWP_ASYNCWINDOWPOS;
+            // Moving is valid for fixed-size windows too; do not submit a resize request at all.
+            if (!resize) flags |= SET_WINDOW_POS_FLAGS.SWP_NOSIZE;
             if (cancellationToken.IsCancellationRequested) return Canceled();
             if (!PInvoke.SetWindowPos(hwnd, HWND.Null,
-                desiredOuter.X, desiredOuter.Y, desiredOuter.Width, desiredOuter.Height,
-                SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER
-                | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER | SET_WINDOW_POS_FLAGS.SWP_ASYNCWINDOWPOS))
+                desiredOuter.X, desiredOuter.Y, desiredOuter.Width, desiredOuter.Height, flags))
             {
-                return WindowActionResult.Failure("Windows denied the resize request. The application may be elevated or unavailable.");
+                return WindowActionResult.Failure("Windows denied the placement request. The application may be elevated or unavailable.");
             }
 
             var deadline = attempt == 0 ? 700 : 1200;
@@ -132,7 +157,7 @@ internal sealed unsafe class Win32WindowSystem : IWindowSystem
         }
 
         // An asynchronous request cannot be withdrawn; a busy app may still apply it later.
-        return WindowActionResult.Failure("Windows did not confirm the requested size. The app may be busy or enforce size limits.");
+        return WindowActionResult.Failure("Windows did not confirm the requested placement. The app may be busy or enforce placement limits.");
     }
 
     public WindowActionResult ApplyState(WindowIdentity target, WindowState state, CancellationToken cancellationToken)

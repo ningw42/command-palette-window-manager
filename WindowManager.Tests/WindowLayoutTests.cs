@@ -32,6 +32,50 @@ public sealed class WindowLayoutTests
     }
 
     [TestMethod]
+    [DataRow(0, 0, 1920, 1040, 800, 600, 560, 220)]
+    [DataRow(0, 40, 1920, 1040, 800, 600, 560, 260)]
+    [DataRow(40, 0, 1880, 1080, 800, 600, 580, 240)]
+    [DataRow(-2560, -200, 2560, 1400, 1600, 1000, -2080, 0)]
+    [DataRow(1920, 0, 3840, 2080, 1600, 1200, 3040, 440)]
+    [DataRow(0, 0, 1001, 777, 800, 600, 100, 88)]
+    [DataRow(0, 40, 1920, 1040, 2400, 1200, -240, -40)]
+    [DataRow(0, 40, 1920, 1040, 1920, 1040, 0, 40)]
+    [DataRow(-1, 40, 1, 1, 1, 1, -1, 40)]
+    public void CentersVisibleBoundsWithoutChangingSize(
+        int x, int y, int workWidth, int workHeight, int width, int height, int expectedX, int expectedY)
+    {
+        var workArea = new WindowRectangle(x, y, workWidth, workHeight);
+        var actual = WindowLayout.Center(new WindowRectangle(-10000, 10000, width, height), workArea);
+
+        var expected = new WindowRectangle(expectedX, expectedY, width, height);
+        Assert.AreEqual(expected, actual);
+        Assert.AreEqual(expected, WindowLayout.Center(actual, workArea));
+    }
+
+    [TestMethod]
+    [DataRow(0, 100, 1920, 1040)]
+    [DataRow(100, -1, 1920, 1040)]
+    [DataRow(100, 100, 0, 1040)]
+    [DataRow(100, 100, 1920, -1)]
+    public void CenterRejectsInvalidRectangles(int width, int height, int workWidth, int workHeight)
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => WindowLayout.Center(
+            new WindowRectangle(0, 0, width, height), new WindowRectangle(0, 0, workWidth, workHeight)));
+    }
+
+    [TestMethod]
+    public void CenterAccountsForInvisibleFrameBordersWithoutChangingOuterSize()
+    {
+        var outer = new WindowRectangle(93, 100, 814, 607);
+        var visible = new WindowRectangle(100, 100, 800, 600);
+        var centered = WindowLayout.Center(visible, new WindowRectangle(0, 40, 1920, 1040));
+
+        var actual = WindowLayout.IncludeInvisibleFrame(centered, outer, visible);
+
+        Assert.AreEqual(new WindowRectangle(553, 260, outer.Width, outer.Height), actual);
+    }
+
+    [TestMethod]
     [DataRow(true, 200, 200, 600, 400, 175, 180, 650, 440)]
     [DataRow(false, 200, 200, 600, 400, 225, 220, 550, 360)]
     [DataRow(true, 0, 0, 200, 160, 0, 0, 250, 200)]
