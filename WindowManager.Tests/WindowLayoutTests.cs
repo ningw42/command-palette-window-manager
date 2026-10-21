@@ -164,6 +164,81 @@ public sealed class WindowLayoutTests
     }
 
     [TestMethod]
+    [DataRow(1, 495, 396, 10, 8)]
+    [DataRow(9, 455, 364, 90, 72)]
+    [DataRow(25, 375, 300, 250, 200)]
+    [DataRow(75, 125, 100, 750, 600)]
+    [DataRow(99, 5, 4, 990, 792)]
+    public void SetsBothDimensionsToAnAbsoluteWorkAreaPercentage(
+        int percentage, int x, int y, int width, int height)
+    {
+        var workArea = new WindowRectangle(0, 0, 1000, 800);
+        var actual = WindowLayout.AtPercentage(new WindowRectangle(200, 200, 600, 400), workArea, percentage);
+        var expected = new WindowRectangle(x, y, width, height);
+
+        Assert.AreEqual(expected, actual);
+        Assert.AreEqual(expected, WindowLayout.AtPercentage(actual, workArea, percentage));
+    }
+
+    [TestMethod]
+    public void AbsolutePercentageKeepsPlacementInsideATaskbarOffsetWorkArea()
+    {
+        var actual = WindowLayout.AtPercentage(
+            new WindowRectangle(0, 40, 200, 100), new WindowRectangle(0, 40, 1920, 1040), 75);
+
+        Assert.AreEqual(new WindowRectangle(0, 40, 1440, 780), actual);
+    }
+
+    [TestMethod]
+    public void AbsolutePercentageUsesPhysicalPixelsOnNegativeCoordinateMonitors()
+    {
+        var actual = WindowLayout.AtPercentage(
+            new WindowRectangle(-2400, 0, 1600, 1000), new WindowRectangle(-2560, -200, 2560, 1400), 75);
+
+        Assert.AreEqual(new WindowRectangle(-2560, -25, 1920, 1050), actual);
+    }
+
+    [TestMethod]
+    public void AbsolutePercentageRoundsOddDimensionsToTheNearestPixel()
+    {
+        var actual = WindowLayout.AtPercentage(
+            new WindowRectangle(200, 100, 500, 400), new WindowRectangle(0, 0, 1001, 777), 33);
+
+        Assert.AreEqual(new WindowRectangle(285, 172, 330, 256), actual);
+    }
+
+    [TestMethod]
+    [DataRow(1)]
+    [DataRow(99)]
+    public void AbsolutePercentageNeverRoundsDimensionsDownToZero(int percentage)
+    {
+        var workArea = new WindowRectangle(-1, 40, 1, 1);
+        Assert.AreEqual(workArea, WindowLayout.AtPercentage(workArea, workArea, percentage));
+    }
+
+    [TestMethod]
+    [DataRow(-1)]
+    [DataRow(0)]
+    [DataRow(100)]
+    [DataRow(101)]
+    public void AbsolutePercentageRejectsStateChangesAndOutOfRangeValues(int percentage)
+    {
+        var workArea = new WindowRectangle(0, 0, 1920, 1040);
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => WindowLayout.AtPercentage(workArea, workArea, percentage));
+    }
+
+    [TestMethod]
+    [DataRow(0, 100, 1000, 800)]
+    [DataRow(100, -1, 1000, 800)]
+    [DataRow(100, 100, 0, 800)]
+    [DataRow(100, 100, 1000, -1)]
+    public void AbsolutePercentageRejectsInvalidRectangles(int width, int height, int workWidth, int workHeight)
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => WindowLayout.AtPercentage(
+            new WindowRectangle(0, 0, width, height), new WindowRectangle(0, 0, workWidth, workHeight), 75));
+    }
+
+    [TestMethod]
     public void AddsInvisibleResizeBordersOutsideTheRequestedVisibleRectangle()
     {
         var actual = WindowLayout.IncludeInvisibleFrame(

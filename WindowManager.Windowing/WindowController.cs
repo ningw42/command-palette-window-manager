@@ -98,6 +98,33 @@ public sealed class WindowController : IDisposable
 
     public WindowActionResult DecreaseSize() => Resize(increase: false);
 
+    /// <summary>Sets both dimensions to a work-area percentage; 0 minimizes and 100 requests native maximization.</summary>
+    public WindowActionResult SetSize(int percentage)
+    {
+        if (percentage is < 0 or > 100) return WindowActionResult.Failure(WindowSizePercentage.InvalidInputMessage);
+        if (percentage == 0) return Minimize();
+        if (percentage == 100) return Maximize();
+
+        return Execute(current =>
+        {
+            if (current.WorkArea is not { IsValid: true } workArea)
+            {
+                return WindowActionResult.Failure("The target monitor's work area could not be determined.");
+            }
+
+            // Non-normal windows have no usable visible frame. Absolute sizing can still restore them,
+            // centered on the known monitor, without interpreting WINDOWPLACEMENT workspace coordinates.
+            var bounds = current.State == WindowState.Normal ? current.VisibleBounds : workArea;
+            if (bounds is not { IsValid: true } visible)
+            {
+                return WindowActionResult.Failure("The target window's visible bounds could not be determined.");
+            }
+
+            return _windows.ApplyBounds(current.Identity,
+                WindowLayout.AtPercentage(visible, workArea, percentage), _lifetime.Token);
+        });
+    }
+
     private WindowActionResult Resize(bool increase) => Execute(current =>
     {
         if (current.WorkArea is not { IsValid: true } workArea)

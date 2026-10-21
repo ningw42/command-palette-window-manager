@@ -32,6 +32,23 @@ internal static class WindowLayout
         };
     }
 
+    internal static WindowRectangle AtPercentage(
+        WindowRectangle visibleBounds, WindowRectangle workArea, int percentage)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(visibleBounds.Width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(visibleBounds.Height);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(workArea.Width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(workArea.Height);
+        // The endpoints are native state changes, not rectangle sizes.
+        ArgumentOutOfRangeException.ThrowIfLessThan(percentage, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(percentage, 99);
+
+        // Round to the nearest physical pixel; very small percentages must still produce a valid rectangle.
+        var width = Math.Max(1, (int)(((long)workArea.Width * percentage + 50) / 100));
+        var height = Math.Max(1, (int)(((long)workArea.Height * percentage + 50) / 100));
+        return ResizeAroundCenter(visibleBounds, workArea, width, height);
+    }
+
     internal static WindowRectangle ResizeByFivePercent(
         WindowRectangle visibleBounds, WindowRectangle workArea, bool increase)
     {
@@ -42,6 +59,12 @@ internal static class WindowLayout
 
         var width = ResizeDimension(visibleBounds.Width, workArea.Width, increase);
         var height = ResizeDimension(visibleBounds.Height, workArea.Height, increase);
+        return ResizeAroundCenter(visibleBounds, workArea, width, height);
+    }
+
+    private static WindowRectangle ResizeAroundCenter(
+        WindowRectangle visibleBounds, WindowRectangle workArea, int width, int height)
+    {
         // Keep the current center, shifting only as much as needed to fit inside the work area.
         var x = Math.Clamp((long)visibleBounds.X + (visibleBounds.Width - (long)width) / 2,
             workArea.X, (long)workArea.X + workArea.Width - width);

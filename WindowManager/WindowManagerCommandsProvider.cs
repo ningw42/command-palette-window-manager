@@ -24,6 +24,7 @@ public partial class WindowManagerCommandsProvider : CommandProvider
         var increaseSize = new IncreaseSizeCommand(windows);
         var decreaseSize = new DecreaseSizeCommand(windows);
         var center = new CenterCommand(windows);
+        var setWindowSize = new SetWindowSizePage(windows);
         _commands = [
             new CommandItem(maximize)
             {
@@ -45,6 +46,11 @@ public partial class WindowManagerCommandsProvider : CommandProvider
                 Title = "Almost Maximized",
                 Subtitle = "Window Manager · Center at 80% of the monitor's usable width and height",
             },
+            new CommandItem(setWindowSize)
+            {
+                Title = "Set Window Size",
+                Subtitle = "Window Manager · Enter 0–100: minimize, resize both dimensions, or maximize",
+            },
             new CommandItem(increaseSize)
             {
                 Title = "Increase by 5%",
@@ -55,7 +61,7 @@ public partial class WindowManagerCommandsProvider : CommandProvider
                 Title = "Decrease by 5%",
                 Subtitle = "Window Manager · Shrink by 5% of the work area, down to 10%",
             },
-            new CommandItem(new WindowManagerPage(almostMaximized, maximize, minimize, increaseSize, decreaseSize, center))
+            new CommandItem(new WindowManagerPage(almostMaximized, maximize, minimize, increaseSize, decreaseSize, center, setWindowSize))
             {
                 Title = DisplayName,
                 MoreCommands = [new CommandContextItem(_settingsManager.Settings.SettingsPage)],
