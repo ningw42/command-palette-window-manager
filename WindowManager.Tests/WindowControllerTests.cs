@@ -26,23 +26,29 @@ public sealed class WindowControllerTests
     }
 
     [TestMethod]
-    public void CanCaptureAnApplicationThatIsStillForegroundWhenInvoked()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void CanCaptureAnApplicationThatIsStillForegroundWhenInvoked(string command)
     {
         var windows = new FakeWindows { Foreground = App };
         windows.Existing[App.Identity.Handle] = App;
         using var controller = new WindowController(windows);
 
-        Assert.IsTrue(controller.AlmostMaximize().Succeeded);
+        Assert.IsTrue(Invoke(controller, command).Succeeded);
         Assert.AreEqual(App.Identity, windows.AppliedTarget);
     }
 
     [TestMethod]
-    public void DoesNotGuessATargetOnColdStartInsideThePalette()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void DoesNotGuessATargetOnColdStartInsideThePalette(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
         using var controller = new WindowController(windows);
 
-        var result = controller.AlmostMaximize();
+        var result = Invoke(controller, command);
 
         Assert.IsFalse(result.Succeeded);
         StringAssert.Contains(result.Error, "focus the application");
@@ -50,7 +56,10 @@ public sealed class WindowControllerTests
     }
 
     [TestMethod]
-    public void SettingsInThePaletteProcessCanBecomeTheTarget()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void SettingsInThePaletteProcessCanBecomeTheTarget(string command)
     {
         var settings = new WindowSnapshot(new WindowIdentity(202, 20, 21), WindowKind.Application, App.WorkArea);
         var windows = new FakeWindows { Foreground = Palette };
@@ -60,12 +69,15 @@ public sealed class WindowControllerTests
         controller.ObserveForeground(settings);
         controller.ObserveForeground(Palette);
 
-        Assert.IsTrue(controller.AlmostMaximize().Succeeded);
+        Assert.IsTrue(Invoke(controller, command).Succeeded);
         Assert.AreEqual(settings.Identity, windows.AppliedTarget);
     }
 
     [TestMethod]
-    public void AnAmbiguousHostWindowInvalidatesThePreviousTarget()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void AnAmbiguousHostWindowInvalidatesThePreviousTarget(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
         windows.Existing[App.Identity.Handle] = App;
@@ -73,14 +85,18 @@ public sealed class WindowControllerTests
         controller.ObserveForeground(App);
         controller.ObserveForeground(Palette with { Kind = WindowKind.Unsupported });
 
-        Assert.IsFalse(controller.AlmostMaximize().Succeeded);
+        Assert.IsFalse(Invoke(controller, command).Succeeded);
         Assert.AreEqual(0, windows.ApplyCount);
     }
 
     [TestMethod]
-    [DataRow(true)]
-    [DataRow(false)]
-    public void ClosedOrReusedHandlesAreNotResized(bool handleReused)
+    [DataRow("AlmostMaximize", true)]
+    [DataRow("AlmostMaximize", false)]
+    [DataRow("Maximize", true)]
+    [DataRow("Maximize", false)]
+    [DataRow("Minimize", true)]
+    [DataRow("Minimize", false)]
+    public void ClosedOrReusedHandlesAreNotChanged(string command, bool handleReused)
     {
         var windows = new FakeWindows { Foreground = Palette };
         if (handleReused)
@@ -91,19 +107,22 @@ public sealed class WindowControllerTests
         using var controller = new WindowController(windows);
         controller.ObserveForeground(App);
 
-        Assert.IsFalse(controller.AlmostMaximize().Succeeded);
+        Assert.IsFalse(Invoke(controller, command).Succeeded);
         Assert.AreEqual(0, windows.ApplyCount);
     }
 
     [TestMethod]
-    public void RevalidatesWindowEligibilityAtInvocation()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void RevalidatesWindowEligibilityAtInvocation(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
         windows.Existing[App.Identity.Handle] = App with { Kind = WindowKind.IgnoredTransient };
         using var controller = new WindowController(windows);
         controller.ObserveForeground(App);
 
-        Assert.IsFalse(controller.AlmostMaximize().Succeeded);
+        Assert.IsFalse(Invoke(controller, command).Succeeded);
         Assert.AreEqual(0, windows.ApplyCount);
     }
 
@@ -132,30 +151,39 @@ public sealed class WindowControllerTests
     }
 
     [TestMethod]
-    public void ReportsNativeFailureInsteadOfClaimingSuccess()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void ReportsNativeFailureInsteadOfClaimingSuccess(string command)
     {
         var expected = WindowActionResult.Failure("Access denied");
         var windows = new FakeWindows { Foreground = App, NextResult = expected };
         windows.Existing[App.Identity.Handle] = App;
         using var controller = new WindowController(windows);
 
-        Assert.AreEqual(expected, controller.AlmostMaximize());
+        Assert.AreEqual(expected, Invoke(controller, command));
     }
 
     [TestMethod]
-    public void DisposalIsIdempotentAndPreventsFurtherOperations()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void DisposalIsIdempotentAndPreventsFurtherOperations(string command)
     {
         var windows = new FakeWindows { Foreground = App };
         using var controller = new WindowController(windows);
         controller.Dispose();
         controller.Dispose();
 
-        Assert.IsFalse(controller.AlmostMaximize().Succeeded);
+        Assert.IsFalse(Invoke(controller, command).Succeeded);
         Assert.AreEqual(0, windows.ApplyCount);
     }
 
     [TestMethod]
-    public void AnUninspectableQueuedForegroundEventClearsOlderHistory()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void AnUninspectableQueuedForegroundEventClearsOlderHistory(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
         windows.Existing[App.Identity.Handle] = App;
@@ -165,18 +193,21 @@ public sealed class WindowControllerTests
         controller.ObserveForeground(null);
         controller.ObserveForeground(Palette);
 
-        Assert.IsFalse(controller.AlmostMaximize().Succeeded);
+        Assert.IsFalse(Invoke(controller, command).Succeeded);
         Assert.AreEqual(0, windows.ApplyCount);
     }
 
     [TestMethod]
-    public void SynchronizationFailureDoesNotFallBackToOlderHistory()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void SynchronizationFailureDoesNotFallBackToOlderHistory(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
         using var controller = new WindowController(windows, () => new TargetCapture(null, "Tracking is catching up"));
         controller.ObserveForeground(App);
 
-        var result = controller.AlmostMaximize();
+        var result = Invoke(controller, command);
 
         Assert.IsFalse(result.Succeeded);
         Assert.AreEqual("Tracking is catching up", result.Error);
@@ -184,7 +215,10 @@ public sealed class WindowControllerTests
     }
 
     [TestMethod]
-    public void TheCapturedTargetIsNotReplacedByALaterHistoryUpdate()
+    [DataRow("AlmostMaximize")]
+    [DataRow("Maximize")]
+    [DataRow("Minimize")]
+    public void TheCapturedTargetIsNotReplacedByALaterHistoryUpdate(string command)
     {
         var selected = App with { Identity = new WindowIdentity(303, 30, 31) };
         var windows = new FakeWindows { Foreground = Palette };
@@ -197,10 +231,35 @@ public sealed class WindowControllerTests
         });
         using (controller)
         {
-            Assert.IsTrue(controller.AlmostMaximize().Succeeded);
+            Assert.IsTrue(Invoke(controller, command).Succeeded);
             Assert.AreEqual(selected.Identity, windows.AppliedTarget);
         }
     }
+
+    [TestMethod]
+    [DataRow("Maximize", true)]
+    [DataRow("Minimize", false)]
+    public void StateCommandsUseTheRememberedTargetWithoutRequiringGeometry(string command, bool maximize)
+    {
+        var windows = new FakeWindows { Foreground = Palette };
+        windows.Existing[App.Identity.Handle] = App with { WorkArea = null };
+        using var controller = new WindowController(windows);
+        controller.ObserveForeground(App);
+
+        Assert.IsTrue(Invoke(controller, command).Succeeded);
+        Assert.AreEqual(App.Identity, windows.AppliedTarget);
+        Assert.AreEqual(maximize ? WindowState.Maximized : WindowState.Minimized, windows.AppliedState);
+        Assert.IsNull(windows.AppliedBounds);
+        Assert.AreEqual(1, windows.ApplyCount);
+    }
+
+    private static WindowActionResult Invoke(WindowController controller, string command) => command switch
+    {
+        "AlmostMaximize" => controller.AlmostMaximize(),
+        "Maximize" => controller.Maximize(),
+        "Minimize" => controller.Minimize(),
+        _ => throw new ArgumentOutOfRangeException(nameof(command)),
+    };
 
     private sealed class FakeWindows : IWindowSystem
     {
@@ -208,8 +267,18 @@ public sealed class WindowControllerTests
         internal Dictionary<nint, WindowSnapshot> Existing { get; } = [];
         internal WindowIdentity? AppliedTarget { get; private set; }
         internal WindowRectangle? AppliedBounds { get; private set; }
+        internal WindowState? AppliedState { get; private set; }
         internal int ApplyCount { get; private set; }
         internal WindowActionResult NextResult { get; init; } = WindowActionResult.Applied;
+
+        public WindowActionResult ApplyState(WindowIdentity target, WindowState state, CancellationToken cancellationToken)
+        {
+            Assert.IsFalse(cancellationToken.IsCancellationRequested);
+            AppliedTarget = target;
+            AppliedState = state;
+            ApplyCount++;
+            return NextResult;
+        }
 
         public WindowSnapshot? ReadForegroundWindow() => Foreground;
         public WindowSnapshot? ReadWindow(nint handle) => Existing.GetValueOrDefault(handle);

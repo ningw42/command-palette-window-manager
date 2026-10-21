@@ -15,6 +15,13 @@ internal enum WindowKind
     Unsupported,
 }
 
+internal enum WindowState
+{
+    Normal,
+    Maximized,
+    Minimized,
+}
+
 internal sealed record WindowSnapshot(
     WindowIdentity Identity,
     WindowKind Kind,
@@ -37,4 +44,6 @@ internal interface IWindowSystem
     WindowSnapshot? ReadWindow(nint handle);
 
     WindowActionResult ApplyBounds(WindowIdentity target, WindowRectangle bounds, CancellationToken cancellationToken);
+
+    WindowActionResult ApplyState(WindowIdentity target, WindowState state, CancellationToken cancellationToken);
 }

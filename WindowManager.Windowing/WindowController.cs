@@ -2,7 +2,7 @@ using System.Runtime.Versioning;
 
 namespace WindowManager.Windowing;
 
-/// <summary>Tracks one last-active application and applies window commands without activating it.</summary>
+/// <summary>Tracks one last-active application and applies window commands to that validated target.</summary>
 public sealed class WindowController : IDisposable
 {
     private readonly IWindowSystem _windows;
@@ -52,7 +52,24 @@ public sealed class WindowController : IDisposable
         }
     }
 
-    public WindowActionResult AlmostMaximize()
+    public WindowActionResult AlmostMaximize() => Execute(current =>
+    {
+        if (current.WorkArea is not { IsValid: true } workArea)
+        {
+            return WindowActionResult.Failure("The target monitor's work area could not be determined.");
+        }
+
+        return _windows.ApplyBounds(current.Identity, WindowLayout.AlmostMaximized(workArea), _lifetime.Token);
+    });
+
+    /// <summary>Requests native maximization, which also activates the target window.</summary>
+    public WindowActionResult Maximize() => Execute(current =>
+        _windows.ApplyState(current.Identity, WindowState.Maximized, _lifetime.Token));
+
+    public WindowActionResult Minimize() => Execute(current =>
+        _windows.ApplyState(current.Identity, WindowState.Minimized, _lifetime.Token));
+
+    private WindowActionResult Execute(Func<WindowSnapshot, WindowActionResult> action)
     {
         lock (_operationGate)
         {
@@ -71,7 +88,7 @@ public sealed class WindowController : IDisposable
 
             if (target is null)
             {
-                return WindowActionResult.Failure("Close Command Palette, focus the application you want to resize, then try again.");
+                return WindowActionResult.Failure("Close Command Palette, focus the application you want to manage, then try again.");
             }
 
             // Freeze identity for this invocation; never fall back to an unrelated window.
@@ -81,13 +98,7 @@ public sealed class WindowController : IDisposable
                 return WindowActionResult.Failure("The previous application window is no longer available. Focus the desired window and retry.");
             }
 
-            if (current.WorkArea is not { IsValid: true } workArea)
-            {
-                return WindowActionResult.Failure("The target monitor's work area could not be determined.");
-            }
-
-            var bounds = WindowLayout.AlmostMaximized(workArea);
-            return _windows.ApplyBounds(target.Value, bounds, _lifetime.Token);
+            return action(current);
         }
     }
 

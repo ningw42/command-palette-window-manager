@@ -126,6 +126,63 @@ internal sealed unsafe class Win32WindowSystem : IWindowSystem
         return WindowActionResult.Failure("Windows did not confirm the requested size. The app may be busy or enforce size limits.");
     }
 
+    public WindowActionResult ApplyState(WindowIdentity target, WindowState state, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested) return Canceled();
+        var snapshot = ReadWindow(target.Handle);
+        if (snapshot?.Identity != target || snapshot.Kind != WindowKind.Application)
+        {
+            return WindowActionResult.Failure("The target window changed or is no longer eligible.");
+        }
+
+        var hwnd = new HWND(target.Handle);
+        var (command, requiredStyle) = state switch
+        {
+            // Native maximization explicitly activates the target. There is no SW_MAXIMIZE_NOACTIVATE.
+            // https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-showwindow
+            WindowState.Maximized => (SHOW_WINDOW_CMD.SW_MAXIMIZE, WINDOW_STYLE.WS_MAXIMIZEBOX),
+            WindowState.Minimized => (SHOW_WINDOW_CMD.SW_SHOWMINNOACTIVE, WINDOW_STYLE.WS_MINIMIZEBOX),
+            _ => throw new ArgumentOutOfRangeException(nameof(state)),
+        };
+        if (HasState(hwnd, state)) return WindowActionResult.Applied;
+
+        var style = (WINDOW_STYLE)(uint)(nuint)PInvoke.GetWindowLongPtr(hwnd, WINDOW_LONG_PTR_INDEX.GWL_STYLE);
+        if ((style & requiredStyle) == 0)
+        {
+            return WindowActionResult.Failure(state == WindowState.Maximized
+                ? "This application window does not support maximizing."
+                : "This application window does not support minimizing.");
+        }
+
+        var current = ReadWindow(target.Handle);
+        if (current?.Identity != target || current.Kind != WindowKind.Application)
+        {
+            return WindowActionResult.Failure("The target window changed before its state could be updated.");
+        }
+
+        if (cancellationToken.IsCancellationRequested) return Canceled();
+        if (!MatchesIdentity(target) || !PInvoke.ShowWindowAsync(hwnd, command))
+        {
+            return WindowActionResult.Failure("Windows denied the state change. The application may be elevated or unavailable.");
+        }
+
+        if (WaitUntil(() => MatchesIdentity(target) && HasState(hwnd, state), Stopwatch.StartNew(), 1200, cancellationToken))
+        {
+            return WindowActionResult.Applied;
+        }
+
+        // Like asynchronous placement, an accepted request may still complete after this deadline.
+        return cancellationToken.IsCancellationRequested ? Canceled()
+            : WindowActionResult.Failure("Windows did not confirm the requested state. The application may be busy.");
+    }
+
+    private static bool HasState(HWND hwnd, WindowState state) => state switch
+    {
+        WindowState.Maximized => PInvoke.IsZoomed(hwnd) && !PInvoke.IsIconic(hwnd),
+        WindowState.Minimized => PInvoke.IsIconic(hwnd),
+        _ => false,
+    };
+
     private static WindowActionResult Canceled() => WindowActionResult.Failure("The window operation was canceled.");
 
     private static bool WaitUntil(Func<bool> condition, Stopwatch elapsed, int deadlineMs, CancellationToken token)

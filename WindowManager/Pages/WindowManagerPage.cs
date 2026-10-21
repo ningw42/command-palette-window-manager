@@ -11,12 +11,22 @@ internal sealed partial class WindowManagerPage : ListPage
 {
     private readonly IListItem[] _items;
 
-    internal WindowManagerPage(AlmostMaximizedCommand almostMaximized)
+    internal WindowManagerPage(AlmostMaximizedCommand almostMaximized, MaximizeCommand maximize, MinimizeCommand minimize)
     {
         Icon = IconHelpers.FromRelativePath("Assets\\StoreLogo.png");
         Title = "Window Manager";
         Name = "Open";
         _items = [
+            new ListItem(maximize)
+            {
+                Title = "Maximize",
+                Subtitle = "Maximize and activate the last-active application on its monitor",
+            },
+            new ListItem(minimize)
+            {
+                Title = "Minimize",
+                Subtitle = "Minimize the last-active application",
+            },
             new ListItem(almostMaximized)
             {
                 Title = "Almost Maximized",

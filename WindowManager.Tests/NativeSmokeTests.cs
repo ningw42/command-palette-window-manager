@@ -29,6 +29,38 @@ public sealed class NativeSmokeTests
     }
 
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void AlreadyCanceledStateChangeDoesNotInspectOrChangeAWindow(bool maximize)
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
+        {
+            Assert.Inconclusive("Requires Windows.");
+            return;
+        }
+
+        var state = maximize ? WindowState.Maximized : WindowState.Minimized;
+        var result = new Win32WindowSystem().ApplyState(default, state, new CancellationToken(true));
+        Assert.IsFalse(result.Succeeded);
+        StringAssert.Contains(result.Error, "canceled");
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void StateChangesRejectAnInvalidHandleWithoutChangingAnyWindows(bool maximize)
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
+        {
+            Assert.Inconclusive("Requires Windows.");
+            return;
+        }
+
+        var state = maximize ? WindowState.Maximized : WindowState.Minimized;
+        Assert.IsFalse(new Win32WindowSystem().ApplyState(default, state, CancellationToken.None).Succeeded);
+    }
+
+    [TestMethod]
     public void AlreadyCanceledPlacementDoesNotEvenInspectOrRestoreAWindow()
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
