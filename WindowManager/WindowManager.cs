@@ -6,6 +6,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.CommandPalette.Extensions;
+using WindowManager.Windowing;
 
 namespace WindowManager;
 
@@ -14,11 +15,14 @@ public sealed partial class WindowManager : IExtension, IDisposable
 {
     private readonly ManualResetEvent _extensionDisposedEvent;
 
-    private readonly WindowManagerCommandsProvider _provider = new();
+    private readonly WindowController _windows;
+    private readonly WindowManagerCommandsProvider _provider;
 
     public WindowManager(ManualResetEvent extensionDisposedEvent)
     {
         this._extensionDisposedEvent = extensionDisposedEvent;
+        _windows = WindowController.CreateForCurrentDesktop();
+        _provider = new WindowManagerCommandsProvider(_windows);
     }
 
     public object? GetProvider(ProviderType providerType)
@@ -30,5 +34,15 @@ public sealed partial class WindowManager : IExtension, IDisposable
         };
     }
 
-    public void Dispose() => this._extensionDisposedEvent.Set();
+    public void Dispose()
+    {
+        try
+        {
+            _windows.Dispose();
+        }
+        finally
+        {
+            _extensionDisposedEvent.Set();
+        }
+    }
 }

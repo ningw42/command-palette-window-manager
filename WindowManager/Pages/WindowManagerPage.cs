@@ -9,17 +9,21 @@ namespace WindowManager;
 
 internal sealed partial class WindowManagerPage : ListPage
 {
-    public WindowManagerPage()
+    private readonly IListItem[] _items;
+
+    internal WindowManagerPage(AlmostMaximizedCommand almostMaximized)
     {
         Icon = IconHelpers.FromRelativePath("Assets\\StoreLogo.png");
         Title = "Window Manager";
         Name = "Open";
-    }
-
-    public override IListItem[] GetItems()
-    {
-        return [
-            new ListItem(new NoOpCommand()) { Title = "TODO: Implement your extension here" }
+        _items = [
+            new ListItem(almostMaximized)
+            {
+                Title = "Almost Maximized",
+                Subtitle = "Center the last-active application at 80% of the monitor's usable width and height",
+            },
         ];
     }
+
+    public override IListItem[] GetItems() => _items;
 }
