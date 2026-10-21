@@ -69,6 +69,37 @@ public sealed class WindowController : IDisposable
     public WindowActionResult Minimize() => Execute(current =>
         _windows.ApplyState(current.Identity, WindowState.Minimized, _lifetime.Token));
 
+    /// <summary>Grows both dimensions by 5% of the work area; at 100%, maximizes and activates the window.</summary>
+    public WindowActionResult IncreaseSize() => Resize(increase: true);
+
+    public WindowActionResult DecreaseSize() => Resize(increase: false);
+
+    private WindowActionResult Resize(bool increase) => Execute(current =>
+    {
+        if (current.WorkArea is not { IsValid: true } workArea)
+        {
+            return WindowActionResult.Failure("The target monitor's work area could not be determined.");
+        }
+
+        if (current.State == WindowState.Minimized)
+        {
+            // DWM does not expose a meaningful current visible rectangle for an iconic window.
+            return WindowActionResult.Failure("Restore the target application before changing its size.");
+        }
+
+        // Maximized frame bounds can extend past the work area; start from exactly 100% instead.
+        var bounds = current.State == WindowState.Maximized ? workArea : current.VisibleBounds;
+        if (bounds is not { IsValid: true } visible)
+        {
+            return WindowActionResult.Failure("The target window's visible bounds could not be determined.");
+        }
+
+        var resized = WindowLayout.ResizeByFivePercent(visible, workArea, increase);
+        return increase && resized.Width == workArea.Width && resized.Height == workArea.Height
+            ? _windows.ApplyState(current.Identity, WindowState.Maximized, _lifetime.Token)
+            : _windows.ApplyBounds(current.Identity, resized, _lifetime.Token);
+    });
+
     private WindowActionResult Execute(Func<WindowSnapshot, WindowActionResult> action)
     {
         lock (_operationGate)

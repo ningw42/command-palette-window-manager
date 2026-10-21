@@ -6,7 +6,8 @@ namespace WindowManager.Tests;
 [TestClass]
 public sealed class WindowControllerTests
 {
-    private static readonly WindowSnapshot App = new(new WindowIdentity(101, 10, 11), WindowKind.Application, new WindowRectangle(0, 40, 1920, 1040));
+    private static readonly WindowSnapshot App = new(new WindowIdentity(101, 10, 11), WindowKind.Application,
+        new WindowRectangle(0, 40, 1920, 1040), new WindowRectangle(400, 300, 800, 600));
     private static readonly WindowSnapshot Palette = new(new WindowIdentity(201, 20, 21), WindowKind.IgnoredTransient, null);
 
     [TestMethod]
@@ -29,6 +30,8 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void CanCaptureAnApplicationThatIsStillForegroundWhenInvoked(string command)
     {
         var windows = new FakeWindows { Foreground = App };
@@ -43,6 +46,8 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void DoesNotGuessATargetOnColdStartInsideThePalette(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
@@ -59,9 +64,11 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void SettingsInThePaletteProcessCanBecomeTheTarget(string command)
     {
-        var settings = new WindowSnapshot(new WindowIdentity(202, 20, 21), WindowKind.Application, App.WorkArea);
+        var settings = new WindowSnapshot(new WindowIdentity(202, 20, 21), WindowKind.Application, App.WorkArea, App.VisibleBounds);
         var windows = new FakeWindows { Foreground = Palette };
         windows.Existing[settings.Identity.Handle] = settings;
         using var controller = new WindowController(windows);
@@ -77,6 +84,8 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void AnAmbiguousHostWindowInvalidatesThePreviousTarget(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
@@ -96,6 +105,10 @@ public sealed class WindowControllerTests
     [DataRow("Maximize", false)]
     [DataRow("Minimize", true)]
     [DataRow("Minimize", false)]
+    [DataRow("IncreaseSize", true)]
+    [DataRow("IncreaseSize", false)]
+    [DataRow("DecreaseSize", true)]
+    [DataRow("DecreaseSize", false)]
     public void ClosedOrReusedHandlesAreNotChanged(string command, bool handleReused)
     {
         var windows = new FakeWindows { Foreground = Palette };
@@ -115,6 +128,8 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void RevalidatesWindowEligibilityAtInvocation(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
@@ -139,14 +154,17 @@ public sealed class WindowControllerTests
     }
 
     [TestMethod]
-    public void MissingWorkAreaDoesNotCauseAResize()
+    [DataRow("AlmostMaximize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
+    public void MissingWorkAreaDoesNotCauseAResize(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
         windows.Existing[App.Identity.Handle] = App with { WorkArea = null };
         using var controller = new WindowController(windows);
         controller.ObserveForeground(App);
 
-        Assert.IsFalse(controller.AlmostMaximize().Succeeded);
+        Assert.IsFalse(Invoke(controller, command).Succeeded);
         Assert.AreEqual(0, windows.ApplyCount);
     }
 
@@ -154,6 +172,8 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void ReportsNativeFailureInsteadOfClaimingSuccess(string command)
     {
         var expected = WindowActionResult.Failure("Access denied");
@@ -168,6 +188,8 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void DisposalIsIdempotentAndPreventsFurtherOperations(string command)
     {
         var windows = new FakeWindows { Foreground = App };
@@ -183,6 +205,8 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void AnUninspectableQueuedForegroundEventClearsOlderHistory(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
@@ -201,6 +225,8 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void SynchronizationFailureDoesNotFallBackToOlderHistory(string command)
     {
         var windows = new FakeWindows { Foreground = Palette };
@@ -218,6 +244,8 @@ public sealed class WindowControllerTests
     [DataRow("AlmostMaximize")]
     [DataRow("Maximize")]
     [DataRow("Minimize")]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
     public void TheCapturedTargetIsNotReplacedByALaterHistoryUpdate(string command)
     {
         var selected = App with { Identity = new WindowIdentity(303, 30, 31) };
@@ -253,11 +281,170 @@ public sealed class WindowControllerTests
         Assert.AreEqual(1, windows.ApplyCount);
     }
 
+    [TestMethod]
+    [DataRow("IncreaseSize", 352, 274, 896, 652)]
+    [DataRow("DecreaseSize", 448, 326, 704, 548)]
+    public void ResizesTheRememberedApplicationUsingItsVisibleBounds(
+        string command, int x, int y, int width, int height)
+    {
+        var windows = new FakeWindows { Foreground = Palette };
+        windows.Existing[App.Identity.Handle] = App;
+        using var controller = new WindowController(windows);
+        controller.ObserveForeground(App);
+
+        Assert.IsTrue(Invoke(controller, command).Succeeded);
+        Assert.AreEqual(App.Identity, windows.AppliedTarget);
+        Assert.AreEqual(new WindowRectangle(x, y, width, height), windows.AppliedBounds);
+        Assert.IsNull(windows.AppliedState);
+    }
+
+    [TestMethod]
+    public void RelativeResizeUsesTheLatestGeometryRatherThanTheObservedGeometry()
+    {
+        var windows = new FakeWindows { Foreground = Palette };
+        windows.Existing[App.Identity.Handle] = App with
+        {
+            WorkArea = new WindowRectangle(-2560, -200, 2560, 1400),
+            VisibleBounds = new WindowRectangle(-2400, 0, 1600, 1000),
+        };
+        using var controller = new WindowController(windows);
+        controller.ObserveForeground(App);
+
+        Assert.IsTrue(controller.IncreaseSize().Succeeded);
+        Assert.AreEqual(new WindowRectangle(-2464, -35, 1728, 1070), windows.AppliedBounds);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void IncreasingToTheCeilingUsesTrueMaximization(bool alreadyMaximized)
+    {
+        var current = App with
+        {
+            VisibleBounds = alreadyMaximized ? null : new WindowRectangle(0, 40, 1900, 1020),
+            State = alreadyMaximized ? WindowState.Maximized : WindowState.Normal,
+        };
+        var windows = new FakeWindows { Foreground = current };
+        windows.Existing[App.Identity.Handle] = current;
+        using var controller = new WindowController(windows);
+
+        Assert.IsTrue(controller.IncreaseSize().Succeeded);
+        Assert.AreEqual(App.Identity, windows.AppliedTarget);
+        Assert.AreEqual(WindowState.Maximized, windows.AppliedState);
+        Assert.IsNull(windows.AppliedBounds);
+    }
+
+    [TestMethod]
+    public void IncreasingToTheCeilingReportsNativeMaximizeFailure()
+    {
+        var current = App with { VisibleBounds = App.WorkArea };
+        var expected = WindowActionResult.Failure("Maximization is unavailable");
+        var windows = new FakeWindows { Foreground = current, NextResult = expected };
+        windows.Existing[App.Identity.Handle] = current;
+        using var controller = new WindowController(windows);
+
+        Assert.AreEqual(expected, controller.IncreaseSize());
+        Assert.AreEqual(WindowState.Maximized, windows.AppliedState);
+        Assert.IsNull(windows.AppliedBounds);
+    }
+
+    [TestMethod]
+    public void OneDimensionAtTheCeilingDoesNotPrematurelyMaximizeTheOther()
+    {
+        var current = App with { VisibleBounds = new WindowRectangle(0, 40, 1920, 832) };
+        var windows = new FakeWindows { Foreground = current };
+        windows.Existing[App.Identity.Handle] = current;
+        using var controller = new WindowController(windows);
+
+        Assert.IsTrue(controller.IncreaseSize().Succeeded);
+        Assert.AreEqual(new WindowRectangle(0, 40, 1920, 884), windows.AppliedBounds);
+        Assert.IsNull(windows.AppliedState);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void DecreasingAMaximizedWindowStartsAtTheWorkAreaNotItsRestoreBounds(bool hasVisibleBounds)
+    {
+        var current = App with { State = WindowState.Maximized, VisibleBounds = hasVisibleBounds ? App.VisibleBounds : null };
+        var windows = new FakeWindows { Foreground = current };
+        windows.Existing[App.Identity.Handle] = current;
+        using var controller = new WindowController(windows);
+
+        Assert.IsTrue(controller.DecreaseSize().Succeeded);
+        Assert.AreEqual(new WindowRectangle(48, 66, 1824, 988), windows.AppliedBounds);
+        Assert.IsNull(windows.AppliedState);
+    }
+
+    [TestMethod]
+    public void DecreasingAtTenPercentDoesNotShrinkFurther()
+    {
+        var current = App with { VisibleBounds = new WindowRectangle(400, 300, 192, 104) };
+        var windows = new FakeWindows { Foreground = current };
+        windows.Existing[App.Identity.Handle] = current;
+        using var controller = new WindowController(windows);
+
+        Assert.IsTrue(controller.DecreaseSize().Succeeded);
+        Assert.AreEqual(current.VisibleBounds, windows.AppliedBounds);
+    }
+
+    [TestMethod]
+    [DataRow("IncreaseSize", false)]
+    [DataRow("DecreaseSize", false)]
+    [DataRow("IncreaseSize", true)]
+    [DataRow("DecreaseSize", true)]
+    public void RelativeResizeRejectsMissingOrInvalidVisibleBounds(string command, bool invalid)
+    {
+        var current = App with { VisibleBounds = invalid ? new WindowRectangle(0, 0, 0, 100) : null };
+        var windows = new FakeWindows { Foreground = current };
+        windows.Existing[App.Identity.Handle] = current;
+        using var controller = new WindowController(windows);
+
+        var result = Invoke(controller, command);
+        Assert.IsFalse(result.Succeeded);
+        StringAssert.Contains(result.Error, "visible bounds");
+        Assert.AreEqual(0, windows.ApplyCount);
+    }
+
+    [TestMethod]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
+    public void RelativeResizeRejectsAnInvalidWorkArea(string command)
+    {
+        var current = App with { WorkArea = new WindowRectangle(0, 0, 0, 1040) };
+        var windows = new FakeWindows { Foreground = current };
+        windows.Existing[App.Identity.Handle] = current;
+        using var controller = new WindowController(windows);
+
+        var result = Invoke(controller, command);
+        Assert.IsFalse(result.Succeeded);
+        StringAssert.Contains(result.Error, "work area");
+        Assert.AreEqual(0, windows.ApplyCount);
+    }
+
+    [TestMethod]
+    [DataRow("IncreaseSize")]
+    [DataRow("DecreaseSize")]
+    public void RelativeResizeDoesNotUseAMinimizedWindowsIconBounds(string command)
+    {
+        var current = App with { State = WindowState.Minimized };
+        var windows = new FakeWindows { Foreground = current };
+        windows.Existing[App.Identity.Handle] = current;
+        using var controller = new WindowController(windows);
+
+        var result = Invoke(controller, command);
+        Assert.IsFalse(result.Succeeded);
+        StringAssert.Contains(result.Error, "Restore the target");
+        Assert.AreEqual(0, windows.ApplyCount);
+    }
+
     private static WindowActionResult Invoke(WindowController controller, string command) => command switch
     {
         "AlmostMaximize" => controller.AlmostMaximize(),
         "Maximize" => controller.Maximize(),
         "Minimize" => controller.Minimize(),
+        "IncreaseSize" => controller.IncreaseSize(),
+        "DecreaseSize" => controller.DecreaseSize(),
         _ => throw new ArgumentOutOfRangeException(nameof(command)),
     };
 

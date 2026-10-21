@@ -25,7 +25,9 @@ internal enum WindowState
 internal sealed record WindowSnapshot(
     WindowIdentity Identity,
     WindowKind Kind,
-    WindowRectangle? WorkArea);
+    WindowRectangle? WorkArea,
+    WindowRectangle? VisibleBounds = null,
+    WindowState State = WindowState.Normal);
 
 internal readonly record struct TargetCapture(WindowIdentity? Target, string? Error);
 

@@ -11,7 +11,9 @@ internal sealed partial class WindowManagerPage : ListPage
 {
     private readonly IListItem[] _items;
 
-    internal WindowManagerPage(AlmostMaximizedCommand almostMaximized, MaximizeCommand maximize, MinimizeCommand minimize)
+    internal WindowManagerPage(
+        AlmostMaximizedCommand almostMaximized, MaximizeCommand maximize, MinimizeCommand minimize,
+        IncreaseSizeCommand increaseSize, DecreaseSizeCommand decreaseSize)
     {
         Icon = IconHelpers.FromRelativePath("Assets\\StoreLogo.png");
         Title = "Window Manager";
@@ -31,6 +33,16 @@ internal sealed partial class WindowManagerPage : ListPage
             {
                 Title = "Almost Maximized",
                 Subtitle = "Center the last-active application at 80% of the monitor's usable width and height",
+            },
+            new ListItem(increaseSize)
+            {
+                Title = "Increase by 5%",
+                Subtitle = "Grow both dimensions by 5% of the work area; maximize and activate at 100%",
+            },
+            new ListItem(decreaseSize)
+            {
+                Title = "Decrease by 5%",
+                Subtitle = "Shrink both dimensions by 5% of the work area, down to a minimum of 10%",
             },
         ];
     }

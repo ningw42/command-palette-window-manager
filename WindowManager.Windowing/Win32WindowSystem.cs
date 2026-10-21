@@ -43,6 +43,8 @@ internal sealed unsafe class Win32WindowSystem : IWindowSystem
 
         var kind = WindowPolicy.Classify(features, facts.ClassName, facts.ExecutableName, facts.Title, facts.Captions);
         WindowRectangle? workArea = null;
+        WindowRectangle? visibleBounds = null;
+        var state = WindowState.Normal;
         if (kind == WindowKind.Application)
         {
             var monitor = PInvoke.MonitorFromWindow(hwnd, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
@@ -51,9 +53,16 @@ internal sealed unsafe class Win32WindowSystem : IWindowSystem
             {
                 workArea = ToRectangle(info.rcWork);
             }
+
+            state = PInvoke.IsIconic(hwnd) ? WindowState.Minimized
+                : PInvoke.IsZoomed(hwnd) ? WindowState.Maximized : WindowState.Normal;
+            if (state == WindowState.Normal && TryGetBounds(hwnd, out _, out var visible))
+            {
+                visibleBounds = visible;
+            }
         }
 
-        return new WindowSnapshot(new WindowIdentity((nint)hwnd.Value, processId, threadId), kind, workArea);
+        return new WindowSnapshot(new WindowIdentity((nint)hwnd.Value, processId, threadId), kind, workArea, visibleBounds, state);
     }
 
     public WindowActionResult ApplyBounds(WindowIdentity target, WindowRectangle bounds, CancellationToken cancellationToken)

@@ -17,6 +17,32 @@ internal static class WindowLayout
             height);
     }
 
+    internal static WindowRectangle ResizeByFivePercent(
+        WindowRectangle visibleBounds, WindowRectangle workArea, bool increase)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(visibleBounds.Width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(visibleBounds.Height);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(workArea.Width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(workArea.Height);
+
+        var width = ResizeDimension(visibleBounds.Width, workArea.Width, increase);
+        var height = ResizeDimension(visibleBounds.Height, workArea.Height, increase);
+        // Keep the current center, shifting only as much as needed to fit inside the work area.
+        var x = Math.Clamp((long)visibleBounds.X + (visibleBounds.Width - (long)width) / 2,
+            workArea.X, (long)workArea.X + workArea.Width - width);
+        var y = Math.Clamp((long)visibleBounds.Y + (visibleBounds.Height - (long)height) / 2,
+            workArea.Y, (long)workArea.Y + workArea.Height - height);
+        return new WindowRectangle(checked((int)x), checked((int)y), width, height);
+    }
+
+    private static int ResizeDimension(int current, int available, bool increase)
+    {
+        // Round 5% to the nearest physical pixel, but never to zero. Round the 10% floor up.
+        var step = Math.Max(1, ((long)available + 10) / 20);
+        var minimum = ((long)available + 9) / 10;
+        return (int)Math.Clamp(current + (increase ? step : -step), minimum, available);
+    }
+
     internal static WindowRectangle IncludeInvisibleFrame(
         WindowRectangle desiredVisibleBounds, WindowRectangle outerBounds, WindowRectangle visibleBounds)
     {
