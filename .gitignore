@@ -1,0 +1,29 @@
+# Visual Studio and per-user configuration
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.pubxml.user
+
+# Build, restore, test, and package output
+**/bin/
+**/obj/
+**/AppPackages/
+**/BundleArtifacts/
+TestResults/
+*.binlog
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.appxupload
+*.msixupload
+
+# Signing material must not be committed
+*.pfx
+*.p12
+*.snk
+
+# Keep Properties/launchSettings.json and Properties/PublishProfiles/*.pubxml:
+# these are part of the official extension's build/deployment configuration.

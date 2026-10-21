@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "WindowManager (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "WindowManager (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
