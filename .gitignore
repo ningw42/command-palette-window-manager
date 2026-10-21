@@ -1,5 +1,6 @@
 # Visual Studio and per-user configuration
 .vs/
+.pi/
 *.user
 *.suo
 *.userosscache
